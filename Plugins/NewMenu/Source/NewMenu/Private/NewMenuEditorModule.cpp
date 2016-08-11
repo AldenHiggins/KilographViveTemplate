@@ -1,7 +1,9 @@
 #include "NewMenuEditorModule.h"
 #include "AssetToolsModule.h"
 #include "ContentBrowserModule.h"
-//#include "Engine/EngineTypes.h"
+#include "Materials/MaterialExpressionScalarParameter.h"
+#include "Editor/MaterialEditor/Public/IMaterialEditor.h"
+#include "Toolkits/ToolkitManager.h"
 
 #undef WITH_EDITORONLY_DATA
 #define WITH_EDITORONLY_DATA 1
@@ -57,10 +59,11 @@ void NewMenuEditorModule::OnCreateNewMenu2(FMenuBarBuilder& InMenuBarBuilder)
 
 void NewMenuEditorModule::colorChangeMaterial(FMenuBuilder& InMenuBarBuilder)
 {
+	// Get the selected asset from the content browser
 	FContentBrowserModule& ContentBrowserModule = FModuleManager::LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
 	TArray<FAssetData> selectedAssets;
 	ContentBrowserModule.Get().GetSelectedAssets(selectedAssets);
-
+	// Exit out if the user hasn't selected anything
 	if (selectedAssets.Num() == 0)
 	{
 		return;
@@ -69,53 +72,59 @@ void NewMenuEditorModule::colorChangeMaterial(FMenuBuilder& InMenuBarBuilder)
 	// Get the selected material
 	UMaterial* selected = (UMaterial *)selectedAssets[0].GetAsset();
 
+	// Get the material expressions
 	TArray<class UMaterialExpression*> *expressions = &selected->Expressions;
-
+	// Exit out if no expressions can be found
 	if (expressions->Num() == 0)
 	{
 		return;
 	}
 
-	UMaterialExpressionMaterialFunctionCall* newFunctionCall = NewObject<UMaterialExpressionMaterialFunctionCall>(selected);
-	newFunctionCall->MaterialExpressionEditorX = -200;
-	newFunctionCall->MaterialExpressionEditorY = selected->Expressions.Num() * 180;
-
-	//UMaterialExpressionMaterialFunctionCall *newFunctionExpression;
-
 	FColorMaterialInput baseColor = selected->BaseColor;
 	UMaterialExpression *colorExpression = baseColor.Expression;
+
+	// Create the scalar parameters for the material
+	UMaterialExpressionScalarParameter *uCoordinateScalar = NewObject<UMaterialExpressionScalarParameter>((UObject *)selected, UMaterialExpressionScalarParameter::StaticClass(), NAME_None, RF_Transactional);
+	uCoordinateScalar->MaterialExpressionEditorX = 200;
+	uCoordinateScalar->MaterialExpressionEditorY = 0;
+	uCoordinateScalar->ParameterName = "ColorWheelU";
+	selected->Expressions.Add(uCoordinateScalar);
+
+	UMaterialExpressionScalarParameter *vCoordinateScalar = NewObject<UMaterialExpressionScalarParameter>((UObject *)selected, UMaterialExpressionScalarParameter::StaticClass(), NAME_None, RF_Transactional);
+	vCoordinateScalar->MaterialExpressionEditorX = 200;
+	vCoordinateScalar->MaterialExpressionEditorY = 200;
+	vCoordinateScalar->ParameterName = "ColorWheelV";
+	selected->Expressions.Add(vCoordinateScalar);
+
+	UMaterialExpressionScalarParameter *colorBlendScalar = NewObject<UMaterialExpressionScalarParameter>((UObject *)selected, UMaterialExpressionScalarParameter::StaticClass(), NAME_None, RF_Transactional);
+	colorBlendScalar->MaterialExpressionEditorX = 200;
+	colorBlendScalar->MaterialExpressionEditorY = 400;
+	colorBlendScalar->ParameterName = "ColorBlendAlpha";
+	selected->Expressions.Add(colorBlendScalar);
 
 	// Get the color change material function
 	FAssetToolsModule& AssetToolsModule = FModuleManager::Get().LoadModuleChecked<FAssetToolsModule>("AssetTools");
 	UMaterialFunction *materialFunction = LoadObject<UMaterialFunction>(NULL, TEXT("/Game/KilographPlayer/Materials/Functions/ApplyColorChange.ApplyColorChange"), NULL, LOAD_None, NULL);
+	// Create the color change expression
+	UMaterialExpressionMaterialFunctionCall* newFunctionCall = NewObject<UMaterialExpressionMaterialFunctionCall>(selected);
+	newFunctionCall->MaterialExpressionEditorX = 400;
+	newFunctionCall->MaterialExpressionEditorY = 0;
+	newFunctionCall->MaterialFunction = materialFunction;
+	newFunctionCall->UpdateFromFunctionResource();
+	expressions->Add(newFunctionCall);
 
-	for (int expressionIndex = 0; expressionIndex < expressions->Num(); expressionIndex++)
-	{
-		UMaterialExpression *expression = (*expressions)[expressionIndex];
-		FName name = expression->GetFName();
-		UE_LOG(LogTemp, Warning, TEXT("EXP Name: %s"), *(name.ToString()));
-		
-		if (expression == colorExpression)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("The color input expression yo yo yo"));
-		}
+	// Set the function inputs to the newly created parameters
+	TArray<struct FFunctionExpressionInput> *functionInputs = &(newFunctionCall->FunctionInputs);
+	vCoordinateScalar->ConnectExpression(&(*functionInputs)[0].Input, 0);
+	uCoordinateScalar->ConnectExpression(&(*functionInputs)[3].Input, 0);
+	colorExpression->ConnectExpression(&(*functionInputs)[2].Input, 0);
+	colorBlendScalar->ConnectExpression(&(*functionInputs)[1].Input, 0);
 
-		// Print the inputs of the expression
-		TArray<FExpressionInput*> inputs = expression->GetInputs();
-		for (int inputIndex = 0; inputIndex < inputs.Num(); inputIndex++)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Input name: %s"), *inputs[inputIndex]->InputName);
-		}
+	selected->BaseColor.Expression = newFunctionCall;
 
-		// Print the outputs of the expression
-		TArray<FExpressionOutput> outputs = expression->GetOutputs();
-		for (int outputIndex = 0; outputIndex < outputs.Num(); outputIndex++)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("Output name: %s"), *outputs[outputIndex].OutputName);
-		}
-	}
+	// Compile the material
+	selected->ForceRecompileForRendering();
 
-	
 	UE_LOG(LogTemp, Warning, TEXT("Expressisons found!!!"));
 }
 
