@@ -1,0 +1,21 @@
+{
+	"PluginFileVersion" : 3,
+
+	"FriendlyName" : "New Menu Example",
+	"Version" : 1,
+	"VersionName" : "1.0",
+	"CreatedBy" : "Satheesh (a.k.a ryanjon2040)",
+	"CreatedByURL" : "https://forums.unrealengine.com/showthread.php?67645-Plugin-Extend-MenuBar",
+	"EngineVersion" : 1579795,
+	"Description" : "Example menu bar extension for MissPigi123",
+	"Category" : "Menu Bar Extension",
+	
+	"Modules" :
+	[		
+		{
+
+			"Name" : "NewMenu",
+			"Type" : "Editor"
+		}
+	]
+}

@@ -10,3 +10,5 @@ ViveTemplate.sln
 ViveTemplate.uproject
 Build/
 .vs/ViveTemplate/v14/.suo
+Plugins/NewMenu/Resources/
+*.TMP
